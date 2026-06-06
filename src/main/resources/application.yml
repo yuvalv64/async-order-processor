@@ -1,0 +1,48 @@
+spring:
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+
+  application:
+    name: async-order-processor
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/order_db?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+    username: order_user
+    password: order_password
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false
+
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/orders_audit_db
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: order-processing-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+server:
+  port: 8080
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+order-event:
+  relay:
+    fixed-delay: 2000

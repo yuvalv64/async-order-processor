@@ -1,0 +1,101 @@
+openapi: 3.0.3
+info:
+  title: Async Order Processor API
+  version: 1.0.0
+  description: |
+    API for the Async Order Processor. 
+    Handles order placement asynchronously using the Transactional Outbox Pattern.
+    Integrates with MySQL, MongoDB, and Apache Kafka.
+paths:
+  /api/v1/create-order:
+    post:
+      summary: Create a new order
+      description: |
+        Accepts a request containing the customer ID and a map of SKU codes to quantities.
+        Decrements the stock in the MySQL database under Optimistic Locking control,
+        persists the order in PENDING state, and registers an outbox event to be relayed to Kafka.
+      operationId: createOrder
+      tags:
+        - orders
+      requestBody:
+        description: Customer identifier and list of items to order
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderRequest"
+      responses:
+        "202":
+          description: Order successfully created and accepted for asynchronous processing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateOrderResponse"
+        "400":
+          description: |
+            Bad Request. Occurs when:
+            - Input validation fails (e.g. customerId is empty, items map is empty).
+            - The JSON payload contains unknown properties (strict validation).
+            - An unknown/non-existent SKU is requested.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: |
+            Conflict. Occurs when:
+            - Insufficient stock quantity is available for the requested SKU.
+            - A concurrent update is detected (Optimistic Locking conflict).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    CreateOrderRequest:
+      type: object
+      required:
+        - customerId
+        - items
+      properties:
+        customerId:
+          type: string
+          minLength: 1
+          description: Unique identifier of the purchasing customer
+          example: "CUST-001"
+        items:
+          type: object
+          description: Map of SKU code (keys) to quantity purchased (values)
+          minProperties: 1
+          example:
+            "SKU-100": 2
+            "SKU-200": 1
+          additionalProperties:
+            type: integer
+            format: int32
+            minimum: 1
+
+    CreateOrderResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Status of the order acceptance
+          example: "ACCEPTED"
+        message:
+          type: string
+          description: Descriptive message about the operation
+          example: "Order registered and processing started."
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: The HTTP error type/status phrase
+          example: "Conflict"
+        message:
+          type: string
+          description: Detailed human-readable error description
+          example: "Lack of quantity for SKU: SKU-100"
